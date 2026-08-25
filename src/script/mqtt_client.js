@@ -1,6 +1,7 @@
+// mqtt_client.js
 import { MQTT_CONFIG } from './config.js';
 import { state, num, clamp, f2 } from './state.js';
-import { onTelemetryUpdate } from './app.js'; // Callback quando chegar mensagem
+import { onTelemetryUpdate } from './app.js'; 
 
 export function connectMqtt(configOverride = null) {
   const cfg = configOverride || MQTT_CONFIG;
@@ -15,8 +16,10 @@ export function connectMqtt(configOverride = null) {
   
   try {
     state.client = mqtt.connect(url, {
-      clientId: `${cfg.cid}-${Math.floor(Math.random()*10000)}`,
-      clean: true, reconnectPeriod: 1000, keepalive: 10
+      clientId: cfg.cid,
+      clean: true, 
+      reconnectPeriod: 1000, 
+      keepalive: 10
     });
   } catch (e) {
     setMqttBadge("err", "MQTT: erro ao criar cliente");
@@ -28,14 +31,18 @@ export function connectMqtt(configOverride = null) {
     state.client.subscribe(cfg.topicTlm, {qos:0});
   });
 
+  state.client.on("reconnect", () => setMqttBadge("warn", "MQTT: reconectando..."));
   state.client.on("close", () => setMqttBadge("err", "MQTT: desconectado"));
+  
   state.client.on("message", (topic, payload) => {
     if (topic !== cfg.topicTlm) return;
     try {
       const d = JSON.parse(payload.toString());
       updateStateFromTelemetry(d);
-      onTelemetryUpdate(d); // Chama a UI para se atualizar
-    } catch (e) {}
+      onTelemetryUpdate(d); 
+    } catch (e) {
+      console.error("Erro ao fazer parse da telemetria:", e);
+    }
   });
 }
 
@@ -62,7 +69,9 @@ export function publishCmd(topic, payload) {
 }
 
 function setMqttBadge(status, text) {
-  document.getElementById("mqttText").textContent = text;
-  const dot = document.getElementById("mqttDot");
-  dot.className = "dot " + status;
+  const textEl = document.getElementById("mqttText");
+  const dotEl = document.getElementById("mqttDot");
+  
+  if (textEl) textEl.textContent = text;
+  if (dotEl) dotEl.className = "dot " + status;
 }
