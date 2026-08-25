@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>E-Wolf | Configuração Avançada (MQTT)</title>
+  <link rel="stylesheet" href="src/css/style.css">
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>Configurador de Acelerador MQTT</h1>
+    <div class="badges">
+      <span class="badge"><span id="mqttDot" class="dot"></span><span id="mqttText">MQTT: desconectado</span></span>
+      <span class="badge">fonte: <b id="srcText">?</b></span>
+      <span class="badge">override: <b id="ovrText">?</b></span>
+      <span class="badge">última msg: <b id="lastMsgText">--:--:--</b></span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card c-6">
+      <h2>Conexão MQTT</h2>
+      <div class="row"><label>Host</label><input id="hostIn" type="text" value="broker.emqx.io"/></div>
+      <div class="row"><label>Porta (WS)</label><input id="portIn" type="number" value="8083"/><label style="min-width:60px">TLS</label><input id="tlsIn" type="checkbox"/></div>
+      <div class="row"><label>Path WS</label><input id="pathIn" type="text" value="/mqtt"/></div>
+      <div class="row"><label>Client ID</label><input id="cidIn" type="text" value="EWolfTelemetryS3"/></div>
+      <div class="row">
+        <button id="btnConnect" class="btn-blue">Conectar</button>
+        <button id="btnDisconnect">Desconectar</button>
+      </div>
+      <div class="muted" style="margin-top: 5px;">*Navegadores usam WebSockets. A porta 1883 é TCP (ESP), no navegador use 8083 (ou 8084 com TLS).</div>
+    </div>
+
+    <div class="card c-6">
+      <h2>Tópicos</h2>
+      <div class="row"><label>Telemetria</label><input id="topicTlmIn" type="text" value="pb/telemetry/json"/></div>
+      <div class="row"><label>Config</label><input id="topicCfgIn" type="text" value="pb/cmd/config"/></div>
+      <div class="row"><label>Comando Motor</label><input id="topicThrIn" type="text" value="pb/cmd/motor"/></div>
+    </div>
+
+    <div class="card c-12">
+      <h2>Sinal Ao Vivo do Acelerador</h2>
+      <div class="kpi">
+        <div class="pill"><div class="muted">Tensão atual</div><div class="v"><span id="voltsNow">--</span> V</div></div>
+        <div class="pill"><div class="muted">Percentual atual</div><div class="v"><span id="pctNow">--</span> %</div></div>
+        <div class="pill"><div class="muted">MIN atual</div><div class="v"><span id="minNow">--</span> V</div></div>
+        <div class="pill"><div class="muted">MAX atual</div><div class="v"><span id="maxNow">--</span> V</div></div>
+      </div>
+      <div class="row"><label>Pedal</label><div class="bar"><div id="barPct" class="fill"></div></div></div>
+      <div class="row"><label>Tensão no range</label><div class="bar"><div id="barVoltRange" class="fill"></div></div></div>
+    </div>
+
+    <div class="card c-8">
+      <h2>Calibração Principal</h2>
+      <div class="row"><label>min_v (V)</label><span class="live-val">Atual: <b id="liveMinV">--</b></span><input id="minVIn" type="number" step="0.001" min="0.2" max="4.8" placeholder="Novo valor"/></div>
+      <div class="row"><label>max_v (V)</label><span class="live-val">Atual: <b id="liveMaxV">--</b></span><input id="maxVIn" type="number" step="0.001" min="0.4" max="4.95" placeholder="Novo valor"/></div>
+      <div class="row"><label>max_pct (%)</label><span class="live-val">Atual: <b id="liveMaxPct">--</b></span><input id="maxPctIn" type="number" step="1" min="1" max="100" placeholder="Novo valor"/></div>
+      <div class="row"><label>start_min_pct (%)</label><span class="live-val">Atual: <b id="liveStartMin">--</b></span><input id="startMinIn" type="number" step="1" min="0" max="40" placeholder="Novo valor"/></div>
+      <div class="row" style="margin-top:10px;">
+        <button id="btnUseNowMin" class="btn-warn">SET VOLTAGE MIN NOW</button>
+        <button id="btnUseNowMax" class="btn-warn">SET VOLTAGE MAX NOW</button>
+      </div>
+      <div class="row">
+        <button id="btnApplyBase" class="btn-ok">Aplicar calibração</button>
+        <button id="btnApplyAll" class="btn-blue">Aplicar tudo (full patch)</button>
+      </div>
+      <div id="warnBox" class="warns" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card c-4">
+      <h2>Teste Sweep (Override)</h2>
+      <div class="row">
+        <label>Modo atual</label>
+        <span id="ctrlModeBadge" class="badge mode-auto">AUTO</span>
+        <span id="ctrlModeHint" class="muted">controle pelo pedal</span>
+      </div>
+      <div class="row"><label>Override manual</label><input id="ovrSlider" type="range" min="0" max="100" value="0"/><b id="ovrVal">0%</b></div>
+      <div class="row">
+        <button id="btnOverrideSend">Enviar override</button>
+        <button id="btnAutoMode">Voltar auto</button>
+      </div>
+    </div>
+
+    <div class="card c-6">
+      <h2>Dinâmica da Resposta</h2>
+      <div class="row"><label>pwm_hz</label><span class="live-val">Atual: <b id="livePwmHz">--</b></span><input id="pwmHzIn" type="number" step="10" placeholder="Novo valor"/></div>
+      <div class="row"><label>rapid_ms</label><span class="live-val">Atual: <b id="liveRapidMs">--</b></span><input id="rapidMsIn" type="number" step="10" placeholder="Novo valor"/></div>
+      <div class="row"><label>rapid_up (%/s)</label><span class="live-val">Atual: <b id="liveRapidUp">--</b></span><input id="rapidUpIn" type="number" step="1" placeholder="Novo valor"/></div>
+      <div class="row"><label>slew_up (%/s)</label><span class="live-val">Atual: <b id="liveSlewUp">--</b></span><input id="slewUpIn" type="number" step="1" placeholder="Novo valor"/></div>
+      <div class="row"><label>slew_dn (%/s)</label><span class="live-val">Atual: <b id="liveSlewDn">--</b></span><input id="slewDnIn" type="number" step="1" placeholder="Novo valor"/></div>
+      <div class="row"><label>zero_timeout_ms</label><span class="live-val">Atual: <b id="liveZeroTo">--</b></span><input id="zeroToIn" type="number" step="10" placeholder="Novo valor"/></div>
+      <div class="row"><button id="btnApplyDynamics" class="btn-ok">Aplicar dinâmica</button></div>
+    </div>
+
+    <div class="card c-6">
+      <h2>Curva e Presets</h2>
+      <div class="row">
+        <button id="btnExport">Exportar perfil JSON</button>
+        <button id="btnImport">Importar perfil JSON</button>
+      </div>
+      <textarea id="profileArea" rows="4" style="width:100%" placeholder='{"min_v":1.10,"max_v":4.25,...}'></textarea>
+    </div>
+
+    <div class="card c-12">
+      <h2>Simulação de Curva</h2>
+      <canvas id="curveCv"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Importando o script principal como Módulo -->
+<script type="module" src="src/script/app.js"></script>
+</body>
+</html>
